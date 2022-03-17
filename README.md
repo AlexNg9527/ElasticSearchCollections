@@ -48,8 +48,8 @@ _res_list = es.scroll_source_generator(es_search_info)
 from threado.simple_thread_runner import SimpleThreadsRunner
 # Define the num_workers and batch_size
 # refer to https://github.com/AlexNg9527/threado
-sr = SimpleThreadsRunner(num_workers=10,fn=fn_data_update)
-sr.run_threads(iter_data=_res_list, batch_size=10)
+sr = SimpleThreadsRunner(fn=fn_data_update)
+sr.run_threads(num_workers=10, iter_data=_res_list, batch_size=10)
 
 # clear scroll_id
 es.delete_scroll_id()
