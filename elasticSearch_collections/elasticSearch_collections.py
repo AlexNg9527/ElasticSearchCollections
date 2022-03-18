@@ -1,9 +1,9 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
 import csv
-from typing import Generator, Dict, Any, List
+from typing import Dict, Any, List
 
-from loguru import logger
+from scroll_source import ScrollSource
 from elasticsearch import Elasticsearch, helpers
 
 
@@ -13,29 +13,8 @@ class ElasticSearchCollections:
         self.scroll_id = None
         self.client = Elasticsearch(hosts, **kwargs)
 
-    def scroll_source_generator(self, search_info: Dict[str, any]) -> Generator[List[Dict[Any, Any]], None, None]:
-        """Generator fn to get the scroll _source"""
-        total_size = 0
-        data = self.client.search(**search_info)
-        scroll_size = len(data['hits']['hits'])
-        self.scroll_id = data['_scroll_id']
-        logger.info(f"Scrolling {str(self.client)} by index: {search_info['index']}\n scroll_id: {self.scroll_id}")
-        if scroll_size == 0:
-            self.client.clear_scroll(scroll_id=self.scroll_id)
-        while scroll_size > 0:
-            request_list = data['hits']['hits']
-            total_size += scroll_size
-            logger.info(f"scroll size: {total_size}")
-            data = self.client.scroll(scroll_id=self.scroll_id, scroll=search_info["scroll"])
-            scroll_size = len(data['hits']['hits'])
-            yield request_list
-
     def bulk(self, actions: List[Dict[Any, Any]]):
         helpers.bulk(client=self.client, actions=actions)
-
-    def delete_scroll_id(self):
-        if self.scroll_id:
-            self.client.clear_scroll(scroll_id=self.scroll_id)
 
     def upload_source_from_csv(self, csvfile):
         """
@@ -59,10 +38,10 @@ class ElasticSearchCollections:
         with open(csvfile, "w") as f:
             csv_writer = csv.DictWriter(f, fieldnames=field_names)
             csv_writer.writeheader()
-            _res_list = self.scroll_source_generator(search_info)
+            _source = ScrollSource(search_info, self.client)
 
-            for _data_list in _res_list:
+            for _data_list in _source:
                 for i in _data_list:
                     csv_writer.writerow(i['_source'])
 
-            self.delete_scroll_id()
+            _source.delete_scroll_id()
